@@ -1,74 +1,84 @@
 #include <iostream>
-#include <vector>
+#include <deque>
 
 using namespace std;
 
-bool checkAvail(int pos, vector<bool> &robots, vector<int> &durability) {
-    // 로봇이 없으면서 내구도가 1 이상이어야 이동 가능
-    return !robots[pos] && durability[pos] >= 1;
+struct conveyor {
+    int durability; // 내구도
+    bool robot; // 로봇 존재 여부
+};
+
+// 1. 벨트 한 칸 회전
+void rotateBelt(deque<conveyor> &belt, int n) {
+    // 가장 마지막 칸 벨트가 첫번째 벨트로 이동
+    belt.push_front(belt.back());
+    belt.pop_back();
+
+    // 로봇이 내려가는 위치에 도달하면 즉시 내리기
+    belt[n - 1].robot = false;
 }
 
-int conveyor(vector<int> &durability, int k) {
-    int step = 0, cnt = 0, n = durability.size() / 2;
-    vector<bool> robots(n, false);
+// 2. 로봇 이동 -> 가장 먼저 벨트에 올라간 로봇 (뒤에서부터 조회)
+void moveRobot(deque<conveyor> &belt, int n) {
+    for (int i = n - 2; i >= 0; i--) {
+        // 현재 칸에 이동시킬 로봇이 없는 경우 스킵
+        if(!belt[i].robot) {
+            continue;
+        }
+        
+        // 다음 칸으로 이동시킬 수 있는지 확인
+        if(!belt[i + 1].robot && belt[i + 1].durability >= 1) {
+            // 로봇 이동 (이동 즉시 내구도 감소)
+            belt[i].robot = false;
+            belt[i + 1].robot = true;
+            belt[i + 1].durability--;
+        }
+
+        // 로봇 내리는 위치에서 내리기
+        belt[n - 1].robot = false;
+    }
+}
+
+// 3. 로봇 올리기 (올리는 위치 0)
+void pubRobot(deque<conveyor> &belt) {
+    if(!belt[0].robot && belt[0].durability >= 1) {
+        belt[0].durability--;
+        belt[0].robot = true;
+    }
+}
+
+// 벨트 내구도 체크
+bool checkFinish(deque<conveyor> &belt, int n, int k) {
+    int count = 0;
+
+    for(int i = 0; i < 2 * n; i++) {
+        if(belt[i].durability == 0) {
+            count++;
+        }
+    }
+
+    return count >= k;
+}
+
+int solution(deque<conveyor> &belt, int n, int k) {
+    int step = 1;
 
     while(true) {
-        step++;
         // 1. 벨트 한 칸 회전
-        // 마지막 컨베이어벨트 칸이 앞으로 와야하므로 잠시 저장
-        int last_d = durability[2 * n - 1];
-        for (int i = 2 * n - 1; i > 0; i--) {
-            // 인덱스 한 칸 뒤로 내구도 옮기기
-            durability[i] = durability[i - 1];
-        }
-        // 올리는 칸 내구도 업데이트
-        durability[0] = last_d;
-
-        // 벨트 회전에 따른 로봇 이동
-        for (int i = n - 1; i > 0; i--) {
-            robots[i] = robots[i - 1];
-        }
-        robots[0] = false;
-
-        // 로봇이 내려가는 위치에 도달하면 즉시 내리기
-        robots[n - 1] = false;
+        rotateBelt(belt, n);
 
         // 2. 로봇 이동 -> 가장 먼저 벨트에 올라간 로봇 (뒤에서부터 조회)
-        for (int i = n - 2; i > 0; i--) {
-            // 현재 칸에 이동시킬 로봇이 없는 경우 스킵
-            if(!robots[i]) {
-                continue;
-            }
-            
-            // 다음 칸으로 이동시킬 수 있는지 확인
-            if(checkAvail(i + 1, robots, durability)) {
-                // 로봇 이동 (이동 즉시 내구도 감소)
-                robots[i] = false;
-                robots[i + 1] = true;
-                durability[i + 1]--;
-
-                // 내구도가 0이 되었다면 카운트값 증가
-                if(durability[i + 1] == 0) {
-                    cnt++;
-                }
-            }
-        }
+        moveRobot(belt, n);
 
         // 3. 로봇 올리기 (올리는 위치 0)
-        if(checkAvail(0, robots, durability)) {
-            robots[0] = true;
-            durability[0]--;
-
-            // 내구도가 0이 되었다면 카운트값 증가
-            if(durability[0] == 0) {
-                cnt++;
-            }
-        }
+        pubRobot(belt);
 
         // 4. 내구도 검사
-        if(cnt >= k) {
+        if(checkFinish(belt, n, k)) {
             return step;
         }
+
+        step++;
     }
 }
 
@@ -80,15 +90,16 @@ int main() {
     int n, k;
     cin >> n >> k;
 
-    // 내구도 입력
-    n *= 2;
-    vector<int> duraility(n);
-    for (int i = 0; i < n; i++) {
-        cin >> duraility[i];
+    // 컨베이어 벨트의 내구도 및 로봇 존재 여부 저장
+    deque<conveyor> belt(2 * n);
+
+    for (int i = 0; i < 2 * n; i++) {
+        cin >> belt[i].durability;
+        belt[i].robot = false;
     }
 
     // 연산
-    int step = conveyor(duraility, k);
+    int step = solution(belt, n, k);
 
     // 출력
     cout << step;
